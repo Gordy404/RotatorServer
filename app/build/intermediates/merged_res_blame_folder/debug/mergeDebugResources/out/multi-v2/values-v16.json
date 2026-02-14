@@ -1,0 +1,19 @@
+{
+    "logs": [
+        {
+            "outputFile": "com.rotator.server.app-mergeDebugResources-39:/values-v16/values-v16.xml",
+            "map": [
+                {
+                    "source": "C:\\Users\\gordo\\.gradle\\caches\\9.2.1\\transforms\\e2c9d7cfda3399650e2c1fc38c1e2c2a\\workspace\\transformed\\core-1.12.0\\res\\values-v16\\values-v16.xml",
+                    "from": {
+                        "startLines": "2",
+                        "startColumns": "4",
+                        "startOffsets": "55",
+                        "endColumns": "65",
+                        "endOffsets": "116"
+                    }
+                }
+            ]
+        }
+    ]
+}

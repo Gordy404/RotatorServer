@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Arduino Uno -->
+    <usb-device
+        product-id="67"
+        vendor-id="9025" />
+
+    <!-- Arduino Mega -->
+    <usb-device
+        product-id="66"
+        vendor-id="9025" />
+
+    <!-- Generic CH340 (common Arduino clones) -->
+    <usb-device
+        product-id="29987"
+        vendor-id="6790" />
+
+    <!-- Generic FTDI -->
+    <usb-device vendor-id="1027" />
+</resources>

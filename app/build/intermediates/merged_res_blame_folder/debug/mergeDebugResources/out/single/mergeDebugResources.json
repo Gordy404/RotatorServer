@@ -1,0 +1,6 @@
+[
+    {
+        "merged": "com.rotator.server.app-debug-41:/xml_device_filter.xml.flat",
+        "source": "com.rotator.server.app-main-43:/xml/device_filter.xml"
+    }
+]
