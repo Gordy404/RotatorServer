@@ -6,6 +6,7 @@ import android.app.NotificationManager
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.content.pm.ServiceInfo
 import android.hardware.usb.UsbManager
 import android.os.Build
 import android.os.IBinder
@@ -27,8 +28,18 @@ import java.net.InetAddress
 import java.net.ServerSocket
 import java.net.Socket
 import java.nio.charset.Charset
+import kotlin.coroutines.coroutineContext
 
 class RotatorService : Service() {
+
+	data class ServiceState(
+		val currentHeading: Int = 0,
+		val isRotating: Boolean = false,
+		val isArduinoConnected: Boolean = false,
+		val clientCount: Int = 0,
+		val localIp: String = "0.0.0.0",
+		val lastMessage: String = ""
+	)
 
 	companion object {
 		const val CHANNEL_ID = "RotatorServiceChannel"
@@ -45,6 +56,7 @@ class RotatorService : Service() {
 	private var serialPort: UsbSerialPort? = null
 	private var currentHeading = 0
 	private var isRotating = false
+	private var isArduinoConnected = false
 
 	// Network
 	private var udpSocket: DatagramSocket? = null
@@ -54,13 +66,20 @@ class RotatorService : Service() {
 	override fun onCreate() {
 		super.onCreate()
 		createNotificationChannel()
-		startForeground(NOTIFICATION_ID, createNotification("Starting..."))
+		
+		val notification = createNotification("Starting...")
+		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+			startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE)
+		} else {
+			startForeground(NOTIFICATION_ID, notification)
+		}
 
 		// Start all services
 		serviceScope.launch { connectToArduino() }
 		serviceScope.launch { startUdpBroadcast() }
 		serviceScope.launch { startTcpServer() }
 		serviceScope.launch { heartbeatLoop() }
+		serviceScope.launch { updateStateLoop() }
 	}
 
 	override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -76,6 +95,33 @@ class RotatorService : Service() {
 		udpSocket?.close()
 		tcpServerSocket?.close()
 		connectedClients.forEach { it.close() }
+		MainActivity.serviceState.value = null
+	}
+
+	private suspend fun updateStateLoop() {
+		while (coroutineContext.isActive) {
+			MainActivity.serviceState.value = ServiceState(
+				currentHeading = currentHeading,
+				isRotating = isRotating,
+				isArduinoConnected = isArduinoConnected,
+				clientCount = connectedClients.size,
+				localIp = getLocalIpAddress() ?: "0.0.0.0",
+				lastMessage = "" // Could track this if needed
+			)
+			delay(500)
+		}
+	}
+
+	private fun getLocalIpAddress(): String? {
+		try {
+			val socket = DatagramSocket()
+			socket.connect(InetAddress.getByName("8.8.8.8"), 10002)
+			val ip = socket.localAddress.hostAddress
+			socket.close()
+			return ip
+		} catch (e: Exception) {
+			return null
+		}
 	}
 
 	// ===========================
@@ -90,6 +136,7 @@ class RotatorService : Service() {
 
 				if (availableDrivers.isEmpty()) {
 					updateNotification("No USB devices found")
+					isArduinoConnected = false
 					return@withContext
 				}
 
@@ -102,10 +149,12 @@ class RotatorService : Service() {
 					setParameters(9600, 8, UsbSerialPort.STOPBITS_1, UsbSerialPort.PARITY_NONE)
 				}
 
+				isArduinoConnected = true
 				updateNotification("Connected to Arduino")
 				startSerialReader()
 
 			} catch (e: Exception) {
+				isArduinoConnected = false
 				updateNotification("USB Error: ${e.message}")
 				delay(5000)
 				connectToArduino() // Retry
@@ -133,10 +182,13 @@ class RotatorService : Service() {
 						}
 					}
 				} catch (e: Exception) {
+					isArduinoConnected = false
 					updateNotification("Serial read error: ${e.message}")
 					delay(1000)
+					break // Break to reconnect
 				}
 			}
+			connectToArduino()
 		}
 	}
 
@@ -184,7 +236,7 @@ class RotatorService : Service() {
 					broadcast = true
 				}
 
-				while (isActive) {
+				while (coroutineContext.isActive) {
 					try {
 						val message = "ROTATOR_SERVER:$TCP_SERVER_PORT"
 						val buffer = message.toByteArray()
@@ -217,7 +269,7 @@ class RotatorService : Service() {
 				tcpServerSocket = ServerSocket(TCP_SERVER_PORT)
 				updateNotification("TCP Server listening on :$TCP_SERVER_PORT")
 
-				while (isActive) {
+				while (coroutineContext.isActive) {
 					try {
 						val socket = tcpServerSocket?.accept()
 						socket?.let {
@@ -226,7 +278,7 @@ class RotatorService : Service() {
 							serviceScope.launch { handler.handle() }
 						}
 					} catch (e: Exception) {
-						if (isActive) {
+						if (coroutineContext.isActive) {
 							updateNotification("Accept error: ${e.message}")
 						}
 					}
@@ -257,7 +309,7 @@ class RotatorService : Service() {
 					output.write("ROTATOR_SERVER v1.0\n".toByteArray())
 					output.flush()
 
-					while (isActive && !socket.isClosed) {
+					while (coroutineContext.isActive && !socket.isClosed) {
 						val line = input.readLine() ?: break
 						processClientCommand(line.trim(), output)
 					}
@@ -349,7 +401,7 @@ class RotatorService : Service() {
 
 	private suspend fun heartbeatLoop() {
 		withContext(Dispatchers.IO) {
-			while (isActive) {
+			while (coroutineContext.isActive) {
 				try {
 					// Send STOP command to Arduino to keep heartbeat alive
 					// Arduino needs a command every 2 seconds

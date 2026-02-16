@@ -33,7 +33,8 @@
         android:debuggable="true"
         android:extractNativeLibs="false"
         android:label="Rotator Server"
-        android:supportsRtl="true" >
+        android:supportsRtl="true"
+        android:testOnly="true" >
 
         <!-- Main Activity -->
         <activity
