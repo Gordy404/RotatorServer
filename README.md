@@ -1,4 +1,17 @@
 ﻿# RotatorServer
+**Purpose:** Runs 24/7 on an old Android phone in your shack, connected to the Arduino via USB OTG.
+
+### Features
+- ✅ USB Serial communication with Arduino (9600 baud)
+- ✅ UDP broadcast on port 8888 for local discovery
+- ✅ TCP server on port 9999 for remote commands
+- ✅ Password authentication (`Password|Command` protocol)
+- ✅ Foreground Service (survives app closure)
+- ✅ Automatic reconnection to Arduino
+- ✅ Heartbeat timeout (sends STOP every 1 second when idle)
+
+
+
 Created Components
 1. AppViewModel (AppViewModel.kt)
 Manages app state using a shared state model
@@ -40,3 +53,4 @@ Client connection/disconnection
 Handles CW/CCW/STOP commands from UI buttons
 Properly broadcasts state changes to the ViewModel
 The interface is fully functional and ready for use once connected to the Arduino!
+
